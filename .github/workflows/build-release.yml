@@ -6,8 +6,59 @@ on:
       - main
 
 jobs:
-  build-and-release:
+  build-64:
     runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup MSYS2 and MinGW (64-bit)
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          install: mingw-w64-x86_64-gcc
+
+      - name: Build 64-bit executable
+        shell: msys2 {0}
+        run: |
+          mkdir -p build
+          g++ src/main.cpp -o build/whois-x64.exe -static -lws2_32
+
+      - name: Upload 64-bit artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: whois-x64
+          path: build/whois-x64.exe
+
+  build-32:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup MSYS2 and MinGW (32-bit)
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW32
+          install: mingw-w64-i686-gcc
+
+      - name: Build 32-bit executable
+        shell: msys2 {0}
+        run: |
+          mkdir -p build
+          g++ src/main.cpp -o build/whois-x86.exe -static -lws2_32
+
+      - name: Upload 32-bit artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: whois-x86
+          path: build/whois-x86.exe
+
+  release:
+    needs: [build-64, build-32]
+    runs-on: ubuntu-latest
 
     permissions:
       contents: write
@@ -16,17 +67,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup MSYS2 and MinGW
-        uses: msys2/setup-msys2@v2
+      - name: Download 64-bit artifact
+        uses: actions/download-artifact@v4
         with:
-          msystem: MINGW64
-          install: mingw-w64-x86_64-gcc
+          name: whois-x64
 
-      - name: Build executable
-        shell: msys2 {0}
-        run: |
-          mkdir -p build
-          g++ src/main.cpp -o build/whois.exe -static -lws2_32
+      - name: Download 32-bit artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: whois-x86
 
       - name: Create tag for release
         id: create-tag
@@ -45,8 +94,10 @@ jobs:
           body: |
             Automated release for commit ${{ github.sha }}.
             ## Changes
-            - Built executable on Windows.
-          files: build/whois.exe
+            - Built 32-bit and 64-bit executables on Windows.
+          files: |
+            whois-x64.exe
+            whois-x86.exe
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
