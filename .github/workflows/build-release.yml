@@ -1,36 +1,52 @@
-name: Build
+name: Build and Release
 
 on:
   push:
-    branches: [main]
-  release:
-    types: [published]
+    branches:
+      - main
 
 jobs:
-  build:
+  build-and-release:
     runs-on: windows-latest
 
+    permissions:
+      contents: write
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Setup MinGW
-      run: |
-        choco install mingw --version=12.2.0.03042023 --yes
-        echo "C:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\bin" >> $env:GITHUB_PATH
+      - name: Setup MSYS2 and MinGW
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          install: mingw-w64-x86_64-gcc
 
-    - name: Build
-      run: |
-        mkdir build
-        g++ src/main.cpp -o build/whois.exe -static -lws2_32
+      - name: Build executable
+        shell: msys2 {0}
+        run: |
+          mkdir -p build
+          g++ src/main.cpp -o build/whois.exe -static -lws2_32
 
-    - name: Upload release asset
-      if: github.event_name == 'release'
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ github.event.release.upload_url }}
-        asset_path: ./build/whois.exe
-        asset_name: whois.exe
-        asset_content_type: application/octet-stream
+      - name: Create tag for release
+        id: create-tag
+        shell: bash
+        run: |
+          TAG_NAME="v$(date +%Y%m%d)-$(git rev-parse --short HEAD)"
+          echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
+          git tag $TAG_NAME
+          git push origin $TAG_NAME
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.create-tag.outputs.tag }}
+          name: Release ${{ steps.create-tag.outputs.tag }}
+          body: |
+            Automated release for commit ${{ github.sha }}.
+            ## Changes
+            - Built executable on Windows.
+          files: build/whois.exe
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
