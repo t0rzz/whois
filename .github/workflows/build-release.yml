@@ -1,0 +1,33 @@
+name: Build and Release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup MinGW
+      run: |
+        choco install mingw --version=12.2.0.03042023 --yes
+        echo "C:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\bin" >> $env:GITHUB_PATH
+
+    - name: Build
+      run: |
+        mkdir build
+        g++ src/main.cpp -o build/whois.exe -static -lws2_32
+
+    - name: Upload release asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: ./build/whois.exe
+        asset_name: whois.exe
+        asset_content_type: application/octet-stream

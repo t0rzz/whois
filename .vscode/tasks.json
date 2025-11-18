@@ -1,0 +1,11 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "build",
+			"type": "shell",
+			"command": "g++ src/main.cpp -o build/whois.exe -static -lws2_32",
+			"group": "build"
+		}
+	]
+}
