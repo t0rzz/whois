@@ -1,6 +1,8 @@
-name: Build and Release
+name: Build
 
 on:
+  push:
+    branches: [main]
   release:
     types: [published]
 
@@ -23,6 +25,7 @@ jobs:
         g++ src/main.cpp -o build/whois.exe -static -lws2_32
 
     - name: Upload release asset
+      if: github.event_name == 'release'
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
